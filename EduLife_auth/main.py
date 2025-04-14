@@ -1,26 +1,39 @@
-import database
 import os
-from fastapi import FastAPI, Body, HTTPException, Depends, status
-import uvicorn
-import bcrypt
+import database
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
+from datetime import datetime, timedelta
+from typing import List, Optional
 from pydantic import BaseModel
+import bcrypt
 
-SECRET_KEY = os.getenv("SECRET_KEY")
+from routers import auth, users, teachers, students, groups
+
+# Настройки JWT
+SECRET_KEY = os.getenv("SECRET_KEY", "default_secret_key_for_development")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-app = FastAPI()
+# Создание приложения FastAPI
+app = FastAPI(
+    title="EduLife Auth API",
+    description="API для аутентификации и управления пользователями в EduLife",
+    version="1.0.0"
+)
 
-class User(BaseModel):
-    username: str
-    email: str
-    full_name: str
-    disabled: bool = None
+# Инициализация базы данных при запуске
+@app.on_event("startup")
+def startup_event():
+    database.create_tables()
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
+# Подключение роутеров
+app.include_router(auth.router)
+app.include_router(users.router)
+app.include_router(teachers.router)
+app.include_router(students.router)
+app.include_router(groups.router)
 
-class TokenData(BaseModel):
-    username: str
+@app.get("/")
+def read_root():
+    return {"message": "EduLife Auth API", "version": "1.0.0"}
