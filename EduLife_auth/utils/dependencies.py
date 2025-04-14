@@ -11,13 +11,13 @@ async def get_user_with_permission(permission: str, current_user: Dict[str, Any]
     # Если пользователь админ, то доступ есть всегда
     if current_user["role_name"] == "admin":
         return current_user
-    
+
     # Проверяем разрешения на основе роли
     permissions = json.loads(current_user["permissions"]) if "permissions" in current_user else {}
-    
+
     # Разбиваем permission на части, например "schedule.read" -> ["schedule", "read"]
     permission_parts = permission.split(".")
-    
+
     # Проверяем, есть ли у пользователя соответствующее разрешение
     current_level = permissions
     for part in permission_parts:
@@ -28,11 +28,11 @@ async def get_user_with_permission(permission: str, current_user: Dict[str, Any]
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Недостаточно прав доступа"
             )
-    
+
     if current_level is not True:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Недостаточно прав доступа"
         )
-    
+
     return current_user

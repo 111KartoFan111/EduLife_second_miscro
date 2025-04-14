@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
-
+import database
 from utils.security import authenticate_user, create_access_token, hash_password, get_current_user
 from database import create_user, get_user_by_username
 
@@ -34,7 +34,7 @@ class UserResponse(BaseModel):
     role: str
     created_at: datetime
 
-@router.post("/token", response_model=Token)
+@router.post("/login", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     user = authenticate_user(form_data.username, form_data.password)
     if not user:
@@ -43,12 +43,12 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
             detail="Неверное имя пользователя или пароль",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     access_token_expires = timedelta(minutes=30)
     access_token = create_access_token(
         data={"sub": user["username"]}, expires_delta=access_token_expires
     )
-    
+
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -66,23 +66,22 @@ async def register_user(user_data: UserCreate):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Пользователь с таким именем уже существует"
         )
-    
-    # Хешируем пароль
+
     hashed_password = hash_password(user_data.password)
-    
-    # Находим ID роли студента (по умолчанию для новых пользователей)
+
+    # Получаем роль студента
     conn = database.get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id FROM roles WHERE name = 'student'")
     student_role = cursor.fetchone()
     conn.close()
-    
+
     if not student_role:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Ошибка при получении роли студента"
         )
-    
+
     # Создаем пользователя
     try:
         user_id = create_user({
@@ -93,10 +92,8 @@ async def register_user(user_data: UserCreate):
             "role_id": student_role["id"],
             "disabled": False
         })
-        
         # Получаем созданного пользователя
         user = database.get_user_by_id(user_id)
-        
         return {
             "id": user["id"],
             "username": user["username"],

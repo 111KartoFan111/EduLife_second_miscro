@@ -452,11 +452,9 @@ def get_teacher_by_id(teacher_id):
             JOIN subjects s ON ts.subject_id = s.id
             WHERE ts.teacher_id = ?
         """, (teacher_id,))
-        
         teacher_dict["subjects"] = [dict(row) for row in cursor.fetchall()]
         conn.close()
         return teacher_dict
-    
     conn.close()
     return None
 
@@ -469,19 +467,16 @@ def create_teacher(teacher_data):
         if not cursor.fetchone():
             conn.close()
             raise ValueError(f"Пользователь с ID {teacher_data['user_id']} не существует")
-        
         # Проверяем, существует ли кафедра
         cursor.execute("SELECT id FROM departments WHERE id = ?", (teacher_data["department_id"],))
         if not cursor.fetchone():
             conn.close()
             raise ValueError(f"Кафедра с ID {teacher_data['department_id']} не существует")
-        
         # Проверяем, не создан ли уже учитель для этого пользователя
         cursor.execute("SELECT id FROM teachers WHERE user_id = ?", (teacher_data["user_id"],))
         if cursor.fetchone():
             conn.close()
             raise ValueError(f"Учитель для пользователя с ID {teacher_data['user_id']} уже существует")
-        
         cursor.execute("""
             INSERT INTO teachers (user_id, department_id, position, contact_info)
             VALUES (?, ?, ?, ?)
@@ -491,9 +486,7 @@ def create_teacher(teacher_data):
             teacher_data["position"],
             teacher_data.get("contact_info", "")
         ))
-        
         teacher_id = cursor.lastrowid
-        
         # Добавляем предметы, если они указаны
         if "subject_ids" in teacher_data and teacher_data["subject_ids"]:
             for subject_id in teacher_data["subject_ids"]:
@@ -502,24 +495,19 @@ def create_teacher(teacher_data):
                     conn.rollback()
                     conn.close()
                     raise ValueError(f"Предмет с ID {subject_id} не существует")
-                
                 cursor.execute("""
                     INSERT INTO teacher_subjects (teacher_id, subject_id)
                     VALUES (?, ?)
                 """, (teacher_id, subject_id))
-        
         # Обновляем роль пользователя на учителя, если она не администратор
         cursor.execute("SELECT role_id FROM users WHERE id = ?", (teacher_data["user_id"],))
         user_role = cursor.fetchone()["role_id"]
-        
         cursor.execute("SELECT id FROM roles WHERE name = 'admin'")
         admin_role_id = cursor.fetchone()["id"]
-        
         if user_role != admin_role_id:
             cursor.execute("SELECT id FROM roles WHERE name = 'teacher'")
             teacher_role_id = cursor.fetchone()["id"]
             cursor.execute("UPDATE users SET role_id = ? WHERE id = ?", (teacher_role_id, teacher_data["user_id"]))
-        
         conn.commit()
         return teacher_id
     except sqlite3.IntegrityError as e:
@@ -616,7 +604,7 @@ def get_all_students():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT 
+        SELECT
             s.id, s.user_id, s.group_id, s.student_id, s.enrollment_year,
             u.full_name, u.email,
             g.name as group_name, g.year as group_year,
@@ -742,7 +730,7 @@ def update_student(student_id, student_data):
         
         update_values.append(student_id)
         cursor.execute(f"""
-            UPDATE students 
+            UPDATE students
             SET {', '.join(update_fields)}
             WHERE id = ?
         """, update_values)
@@ -757,6 +745,23 @@ def update_student(student_id, student_data):
             raise ValueError(f"Ошибка при обновлении студента: {str(e)}")
     finally:
         conn.close()
+
+
+# Добавьте в database.py
+def get_all_users():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT
+            u.id, u.username, u.email, u.full_name,
+            u.role_id, r.name as role_name, u.disabled, u.created_at
+        FROM users u
+        JOIN roles r ON u.role_id = r.id
+        ORDER BY u.username
+    """)
+    users = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return users
 
 def delete_student(student_id):
     conn = get_db_connection()
