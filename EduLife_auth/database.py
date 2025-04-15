@@ -789,3 +789,105 @@ def delete_student(student_id):
         raise ValueError(f"Ошибка при удалении студента: {str(e)}")
     finally:
         conn.close()
+
+
+# Функции для работы с факультетами
+def get_all_faculties():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, name, description, created_at
+        FROM faculties
+        ORDER BY name
+    """)
+    faculties = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return faculties
+
+def get_faculty_by_id(faculty_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, name, description, created_at
+        FROM faculties
+        WHERE id = ?
+    """, (faculty_id,))
+    faculty = cursor.fetchone()
+    conn.close()
+    if faculty:
+        return dict(faculty)
+    return None
+
+def create_faculty(faculty_data):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO faculties (name, description)
+            VALUES (?, ?)
+        """, (
+            faculty_data["name"],
+            faculty_data.get("description", "")
+        ))
+        faculty_id = cursor.lastrowid
+        conn.commit()
+        return faculty_id
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        raise ValueError(f"Факультет с названием '{faculty_data['name']}' уже существует")
+    finally:
+        conn.close()
+
+def update_faculty(faculty_id, faculty_data):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        update_fields = []
+        update_values = []
+        
+        for field, value in faculty_data.items():
+            if field in ["name", "description"]:
+                update_fields.append(f"{field} = ?")
+                update_values.append(value)
+        
+        if not update_fields:
+            return faculty_id
+        
+        update_values.append(faculty_id)
+        cursor.execute(f"""
+            UPDATE faculties 
+            SET {', '.join(update_fields)}
+            WHERE id = ?
+        """, update_values)
+        
+        conn.commit()
+        return faculty_id
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        raise ValueError(f"Факультет с названием '{faculty_data.get('name')}' уже существует")
+    finally:
+        conn.close()
+
+def delete_faculty(faculty_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Проверяем, есть ли связанные кафедры или группы
+        cursor.execute("SELECT COUNT(*) FROM departments WHERE faculty_id = ?", (faculty_id,))
+        if cursor.fetchone()[0] > 0:
+            conn.close()
+            raise ValueError("Невозможно удалить факультет, к которому привязаны кафедры")
+        
+        cursor.execute("SELECT COUNT(*) FROM groups WHERE faculty_id = ?", (faculty_id,))
+        if cursor.fetchone()[0] > 0:
+            conn.close()
+            raise ValueError("Невозможно удалить факультет, к которому привязаны группы")
+        
+        cursor.execute("DELETE FROM faculties WHERE id = ?", (faculty_id,))
+        conn.commit()
+        return True
+    except Exception as e:
+        conn.rollback()
+        raise ValueError(f"Ошибка при удалении факультета: {str(e)}")
+    finally:
+        conn.close()

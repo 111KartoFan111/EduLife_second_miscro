@@ -3,6 +3,7 @@ from typing import List
 from pydantic import BaseModel
 import database
 from utils.security import get_current_user, check_admin_role
+from utils.api import get_all_subjects
 
 router = APIRouter(
     prefix="/teachers",
@@ -15,13 +16,11 @@ class TeacherCreate(BaseModel):
     department_id: int
     position: str
     contact_info: str | None = None
-    subject_ids: List[int] | None = None
 
 class TeacherUpdate(BaseModel):
     department_id: int | None = None
     position: str | None = None
     contact_info: str | None = None
-    subject_ids: List[int] | None = None
 
 class TeacherResponse(BaseModel):
     id: int
@@ -48,14 +47,14 @@ async def get_teacher(teacher_id: int):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Преподаватель не найден"
         )
-    return teacher
+    return {**teacher, "subjects": await get_subjects_by_teacher_id(teacher_id)}
 
 @router.post("/", response_model=TeacherResponse, dependencies=[Depends(check_admin_role)])
 async def create_teacher(teacher: TeacherCreate):
     """Создать нового преподавателя (только для администраторов)"""
     try:
         teacher_id = database.create_teacher(teacher.dict())
-        return database.get_teacher_by_id(teacher_id)
+        return {**database.get_teacher_by_id(teacher_id), "subjects": []}
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -79,7 +78,7 @@ async def update_teacher(teacher_id: int, teacher: TeacherUpdate):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Преподаватель не найден"
             )
-        return teacher
+        return {**teacher, "subjects": await get_subjects_by_teacher_id(teacher_id)}
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
