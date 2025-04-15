@@ -78,18 +78,18 @@ async def send_notifications(background_tasks: BackgroundTasks):
     notifications = database.get_pending_notifications()
     if not notifications:
         return
-    
+
     # Здесь можно реализовать логику отправки уведомлений через различные каналы
     # Например, отправка по электронной почте, через Telegram или другие системы
     # Для простоты примера просто выводим в консоль
     print(f"Отправка {len(notifications)} уведомлений о изменениях в расписании")
     for notification in notifications:
         print(f"Уведомление #{notification['id']}: {notification['change_type']} для расписания #{notification['schedule_id']}")
-    
+
     # Отметка уведомлений как отправленных
     notification_ids = [n['id'] for n in notifications]
     database.mark_notifications_as_sent(notification_ids)
-    
+
     print(f"Успешно отправлено {len(notifications)} уведомлений")
 
 
